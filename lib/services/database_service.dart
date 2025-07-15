@@ -262,11 +262,13 @@ class DatabaseService {
 
   Future<MedicineDoseRecord?> getDoseRecord(int planId, int doseOrder, DateTime date) async {
     final db = await database;
-    final dateOnly = DateTime(date.year, date.month, date.day).toIso8601String();
+    final datePrefix = DateTime(date.year, date.month, date.day).toIso8601String().substring(0, 10); // 'yyyy-MM-dd'
     final maps = await db.query(
       'medicine_dose_records',
-      where: 'planId = ? AND doseOrder = ? AND date = ?',
-      whereArgs: [planId, doseOrder, dateOnly],
+      where: 'planId = ? AND doseOrder = ? AND date LIKE ?',
+      whereArgs: [planId, doseOrder, '$datePrefix%'],
+      orderBy: 'date DESC',
+      limit: 1,
     );
     if (maps.isNotEmpty) {
       return MedicineDoseRecord.fromMap(maps.first);

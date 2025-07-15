@@ -1,0 +1,12 @@
+<svg width="120" height="120" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <!-- 背景圆 -->
+  <circle cx="60" cy="60" r="56" fill="#E3F2FD" stroke="#2196F3" stroke-width="4"/>
+  <!-- 药丸主体 -->
+  <rect x="35" y="50" width="50" height="20" rx="10" fill="#90CAF9" stroke="#1976D2" stroke-width="2"/>
+  <!-- 药丸分割线 -->
+  <line x1="60" y1="52" x2="60" y2="68" stroke="#1976D2" stroke-width="2"/>
+  <!-- 药丸高光 -->
+  <ellipse cx="45" cy="60" rx="7" ry="3" fill="#FFFFFF" fill-opacity="0.7"/>
+  <!-- 打勾符号，代表记录/完成 -->
+  <polyline points="50,75 58,85 75,65" fill="none" stroke="#43A047" stroke-width="4" stroke-linecap="round" stroke-linejoin="round"/>
+</svg> 

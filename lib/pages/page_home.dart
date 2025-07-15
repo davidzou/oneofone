@@ -90,6 +90,14 @@ class _HomePageState extends State<HomePage> {
   Map<int, List<MedicineDose>> _planDoses = {};
   Map<String, bool> _doseTaken = {}; // key: planId-doseOrder
 
+  int _selectedIndex = 0;
+
+  void _onNavBarTapped(int index) {
+    setState(() {
+      _selectedIndex = index;
+    });
+  }
+
   @override
   void initState() {
     super.initState();
@@ -142,7 +150,7 @@ class _HomePageState extends State<HomePage> {
       id: null,
       planId: planId,
       doseOrder: doseOrder,
-      date: DateTime(_today.year, _today.month, _today.day),
+      date: DateTime.now(), // 保存完整时间
       dosage: dosage,
       isTaken: true,
       notes: null,
@@ -188,6 +196,29 @@ class _HomePageState extends State<HomePage> {
   Widget build(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final isSmallScreen = screenWidth < 400;
+    final List<Widget> _pages = [
+      _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : RefreshIndicator(
+              onRefresh: _loadData,
+              child: SingleChildScrollView(
+                physics: const AlwaysScrollableScrollPhysics(),
+                padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    _buildTodayStatusCard(),
+                    SizedBox(height: isSmallScreen ? 16 : 20),
+                    _buildPlansCard(),
+                  ],
+                ),
+              ),
+            ),
+      Padding(
+        padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
+        child: _buildHistoryCard(),
+      ),
+    ];
     return Scaffold(
       appBar: AppBar(
         title: const Text('吃药记录'),
@@ -216,130 +247,91 @@ class _HomePageState extends State<HomePage> {
               ).then((_) => _loadData());
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.settings),
-            onPressed: () {
-              Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (context) => const SettingsPage(),
-                ),
-              ).then((_) => _loadData());
-            },
+        ],
+      ),
+      body: _pages[_selectedIndex],
+      bottomNavigationBar: BottomNavigationBar(
+        currentIndex: _selectedIndex,
+        onTap: _onNavBarTapped,
+        items: const [
+          BottomNavigationBarItem(
+            icon: Icon(Icons.home),
+            label: '首页',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.history),
+            label: '最近记录',
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: _loadData,
-              child: SingleChildScrollView(
-                physics: const AlwaysScrollableScrollPhysics(),
-                padding: EdgeInsets.all(isSmallScreen ? 12.0 : 16.0),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildTodayStatusCard(),
-                    SizedBox(height: isSmallScreen ? 16 : 20),
-                    _buildPlansCard(),
-                    SizedBox(height: isSmallScreen ? 16 : 20),
-                    _buildHistoryCard(),
-                  ],
-                ),
-              ),
-            ),
-      floatingActionButton: null, // 多次计划已支持单独记录，主按钮可移除
+      floatingActionButton: null,
     );
   }
 
   Widget _buildTodayStatusCard() {
-    final List<Widget> statusList = [];
-    double totalTodayDosage = 0;
     if (_plans.isEmpty) {
       return Card(
         elevation: 4,
-        child: Padding(
-          padding: const EdgeInsets.all(16.0),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: const [
-              Text('今日状态', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              SizedBox(height: 12),
-              Text('暂无吃药计划', style: TextStyle(color: Colors.grey)),
-            ],
-          ),
-        ),
-      );
-    }
-    return FutureBuilder<List<List<MedicineDoseRecord>>>(
-      future: Future.wait(_plans.map((plan) => _databaseService.getDoseRecordsByPlanId(plan.id!)).toList()),
-      builder: (context, snapshot) {
-        if (!snapshot.hasData) {
-          return const Card(child: Padding(padding: EdgeInsets.all(16), child: Center(child: CircularProgressIndicator())));
-        }
-        final allRecords = snapshot.data!;
-        if (allRecords.length != _plans.length) {
-          return const Card(child: Padding(padding: EdgeInsets.all(16), child: Center(child: Text('数据加载异常'))));
-        }
-        for (int idx = 0; idx < _plans.length; idx++) {
-          final plan = _plans[idx];
-          final doses = _planDoses[plan.id!] ?? [];
-          final records = allRecords[idx];
-          double todayDosage = 0;
-          int todayTakenCount = 0;
-          int todaySuggestCount = doses.length;
-          int totalTakenCount = records.length;
-          double totalTakenDosage = records.fold(0, (sum, r) => sum + r.dosage);
-          // 今日统计
-          final today = DateTime.now();
-          for (final d in doses) {
-            final taken = _doseTaken['${plan.id!}-${d.doseOrder}'] ?? false;
-            if (taken) {
-              todayTakenCount++;
-              todayDosage += d.dosage;
-            }
-          }
-          totalTodayDosage += todayDosage;
-          int? totalDoses = plan.totalDoses;
-          String unit = plan.unit ?? '次';
-          bool isCourse = plan.planType == 'course';
-          String progressText = '';
-          bool isFinished = false;
-          if (isCourse && totalDoses != null) {
-            progressText = '疗程进度：$totalTakenCount/$totalDoses$unit';
-            if (totalTakenCount >= totalDoses) {
-              isFinished = true;
-            }
-          } else {
-            progressText = '累计已吃：$totalTakenCount$unit';
-          }
-          statusList.add(
-            ListTile(
-              leading: Icon(isCourse && isFinished ? Icons.verified : Icons.medication, color: isCourse && isFinished ? Colors.green : Colors.blue),
-              title: Text('${plan.name}'),
-              subtitle: Text(isCourse && isFinished
-                  ? '已完成疗程'
-                  : '今日已吃$todayTakenCount/$todaySuggestCount次，$progressText'),
-              trailing: Text('今日药量：${todayDosage.toStringAsFixed(2)}${plan.unit ?? ''}'),
-            ),
-          );
-        }
-        return Card(
-          elevation: 4,
+        margin: EdgeInsets.zero,
+        child: SizedBox(
+          width: double.infinity,
           child: Padding(
             padding: const EdgeInsets.all(16.0),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                const Text('今日状态', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                const SizedBox(height: 12),
-                ...statusList,
-                const Divider(),
-                Text('今日总药量：${totalTodayDosage.toStringAsFixed(2)}', style: const TextStyle(fontWeight: FontWeight.bold)),
+              children: const [
+                Text('今日服药总览', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+                SizedBox(height: 12),
+                Text('暂无吃药计划', style: TextStyle(color: Colors.grey)),
               ],
             ),
           ),
-        );
-      },
+        ),
+      );
+    }
+    // 统计所有药品今日应吃总量、已吃总量、总建议次数、已吃次数
+    int totalSuggestCount = 0;
+    int totalTakenCount = 0;
+    double totalSuggestDosage = 0;
+    double totalTakenDosage = 0;
+    for (final plan in _plans) {
+      final doses = _planDoses[plan.id!] ?? [];
+      totalSuggestCount += doses.length;
+      totalSuggestDosage += doses.fold(0, (sum, d) => sum + d.dosage);
+      for (final d in doses) {
+        final taken = _doseTaken['${plan.id!}-${d.doseOrder}'] ?? false;
+        if (taken) {
+          totalTakenCount++;
+          totalTakenDosage += d.dosage;
+        }
+      }
+    }
+    double percent = totalSuggestDosage == 0 ? 0 : (totalTakenDosage / totalSuggestDosage).clamp(0.0, 1.0);
+    Color progressColor = percent >= 1.0 ? Colors.green : Colors.blue;
+    String statusText = percent >= 1.0 ? '今日已全部完成' : '请按时服药';
+    Color statusColor = percent >= 1.0 ? Colors.green : Colors.orange;
+    return Card(
+      elevation: 4,
+      child: Padding(
+        padding: const EdgeInsets.all(16.0),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            const Text('今日服药总览', style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
+            const SizedBox(height: 12),
+            Text('已吃 $totalTakenCount/$totalSuggestCount 次，药量 ${totalTakenDosage.toStringAsFixed(2)}/${totalSuggestDosage.toStringAsFixed(2)}'),
+            const SizedBox(height: 8),
+            LinearProgressIndicator(
+              value: percent,
+              minHeight: 12,
+              backgroundColor: Colors.grey[200],
+              valueColor: AlwaysStoppedAnimation<Color>(progressColor),
+            ),
+            const SizedBox(height: 8),
+            Text(statusText, style: TextStyle(color: statusColor)),
+          ],
+        ),
+      ),
     );
   }
 
@@ -417,6 +409,7 @@ class _HomePageState extends State<HomePage> {
     if (_plans.isEmpty) {
       return const SizedBox();
     }
+    final today = DateTime.now();
     return Card(
       elevation: 4,
       child: Padding(
@@ -434,17 +427,27 @@ class _HomePageState extends State<HomePage> {
                   Text(plan.name, style: const TextStyle(fontWeight: FontWeight.bold)),
                   ...doses.map((d) {
                     final taken = _doseTaken['${plan.id!}-${d.doseOrder}'] ?? false;
-                    return ListTile(
-                      dense: true,
-                      contentPadding: EdgeInsets.zero,
-                      leading: Icon(taken ? Icons.check_circle : Icons.radio_button_unchecked, color: taken ? Colors.green : Colors.grey),
-                      title: Text('第${d.doseOrder}次 ${d.suggestTime}  药量：${d.dosage}'),
-                      trailing: taken
-                          ? const Text('已记录', style: TextStyle(color: Colors.green))
-                          : ElevatedButton(
-                              onPressed: () => _recordDose(plan.id!, d.doseOrder, d.dosage),
-                              child: const Text('记录'),
-                            ),
+                    return FutureBuilder<MedicineDoseRecord?>(
+                      future: _databaseService.getDoseRecord(plan.id!, d.doseOrder, today),
+                      builder: (context, snapshot) {
+                        String? timeStr;
+                        if (taken && snapshot.hasData && snapshot.data != null) {
+                          timeStr = DateFormat('HH:mm:ss').format(snapshot.data!.date);
+                        }
+                        return ListTile(
+                          dense: true,
+                          contentPadding: EdgeInsets.zero,
+                          leading: Icon(taken ? Icons.check_circle : Icons.radio_button_unchecked, color: taken ? Colors.green : Colors.grey),
+                          title: Text('第${d.doseOrder}次 ${d.suggestTime}  药量：${d.dosage}'),
+                          subtitle: taken && timeStr != null ? Text('记录于 $timeStr') : null,
+                          trailing: taken
+                              ? const Text('已记录', style: TextStyle(color: Colors.green))
+                              : ElevatedButton(
+                                  onPressed: () => _recordDose(plan.id!, d.doseOrder, d.dosage),
+                                  child: const Text('记录'),
+                                ),
+                        );
+                      },
                     );
                   }).toList(),
                   const Divider(),
@@ -489,7 +492,7 @@ Widget _buildHistoryCard() {
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(child: CircularProgressIndicator());
-              }
+    }
               if (snapshot.hasError) {
                 return const Text('加载失败');
               }

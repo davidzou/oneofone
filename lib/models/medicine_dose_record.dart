@@ -22,7 +22,7 @@ class MedicineDoseRecord {
       'id': id,
       'planId': planId,
       'doseOrder': doseOrder,
-      'date': DateTime(date.year, date.month, date.day).toIso8601String(),
+      'date': date.toIso8601String(), // 保留完整时间
       'dosage': dosage,
       'isTaken': isTaken ? 1 : 0,
       'notes': notes,
