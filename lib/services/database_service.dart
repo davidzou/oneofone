@@ -138,13 +138,13 @@ class DatabaseService {
     DateTime endDate,
   ) async {
     final db = await database;
-    final startStr = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String();
-    final endStr = DateTime(endDate.year, endDate.month, endDate.day).toIso8601String();
+    final startStr = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String().substring(0, 10);
+    final endStr = DateTime(endDate.year, endDate.month, endDate.day).toIso8601String().substring(0, 10);
     
     final List<Map<String, dynamic>> maps = await db.query(
       'medicine_records',
-      where: 'date BETWEEN ? AND ?',
-      whereArgs: [startStr, endStr],
+      where: 'date LIKE ? OR date LIKE ? OR (date >= ? AND date <= ?)',
+      whereArgs: ['$startStr%', '$endStr%', '${startStr}T00:00:00', '${endStr}T23:59:59'],
       orderBy: 'date DESC',
     );
 
@@ -278,23 +278,23 @@ class DatabaseService {
 
   Future<List<MedicineDoseRecord>> getDoseRecordsForDate(DateTime date) async {
     final db = await database;
-    final dateOnly = DateTime(date.year, date.month, date.day).toIso8601String();
+    final datePrefix = DateTime(date.year, date.month, date.day).toIso8601String().substring(0, 10);
     final maps = await db.query(
       'medicine_dose_records',
-      where: 'date = ?',
-      whereArgs: [dateOnly],
+      where: 'date LIKE ?',
+      whereArgs: ['$datePrefix%'],
     );
     return maps.map((e) => MedicineDoseRecord.fromMap(e)).toList();
   }
 
   Future<List<MedicineDoseRecord>> getDoseRecordsForDateRange(DateTime startDate, DateTime endDate) async {
     final db = await database;
-    final startStr = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String();
-    final endStr = DateTime(endDate.year, endDate.month, endDate.day).toIso8601String();
+    final startStr = DateTime(startDate.year, startDate.month, startDate.day).toIso8601String().substring(0, 10);
+    final endStr = DateTime(endDate.year, endDate.month, endDate.day).toIso8601String().substring(0, 10);
     final maps = await db.query(
       'medicine_dose_records',
-      where: 'date BETWEEN ? AND ?',
-      whereArgs: [startStr, endStr],
+      where: 'date LIKE ? OR date LIKE ? OR (date >= ? AND date <= ?)',
+      whereArgs: ['$startStr%', '$endStr%', '${startStr}T00:00:00', '${endStr}T23:59:59'],
       orderBy: 'date DESC',
     );
     return maps.map((e) => MedicineDoseRecord.fromMap(e)).toList();

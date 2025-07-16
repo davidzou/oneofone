@@ -55,17 +55,28 @@ class UnifiedRecord {
 Future<List<UnifiedRecord>> getRecentUnifiedRecords(DatabaseService db) async {
   final today = DateTime.now();
   final days = 7;
+  
   // 多次计划
   final doseRecords = await db.getDoseRecordsForDateRange(today.subtract(Duration(days: days-1)), today);
+  print('多次计划记录数量: ${doseRecords.length}');
+  
   final plans = await db.getAllMedicinePlans();
+  print('计划数量: ${plans.length}');
+  
   final planMap = {for (var p in plans) p.id!: p.name};
   final doseUnified = doseRecords.map((d) => UnifiedRecord.fromDose(d, planMap[d.planId] ?? '未知计划')).toList();
+  
   // 单次计划
   final singleRecords = await db.getMedicineRecordsForDateRange(today.subtract(Duration(days: days-1)), today);
+  print('单次计划记录数量: ${singleRecords.length}');
+  
   final singleUnified = singleRecords.map((s) => UnifiedRecord.fromSingle(s)).toList();
+  
   // 合并
   final all = [...doseUnified, ...singleUnified];
   all.sort((a, b) => b.date.compareTo(a.date));
+  
+  print('总记录数量: ${all.length}');
   return all;
 }
 
